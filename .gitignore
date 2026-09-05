@@ -1,0 +1,10 @@
+.env
+bin/
+tmp/
+*.exe
+coverage.out
+.DS_Store
+.tools/
+.gopath/
+go-toolchain.zip
+go.tar.gz

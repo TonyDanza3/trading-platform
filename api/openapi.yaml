@@ -1,0 +1,597 @@
+openapi: 3.0.3
+info:
+  title: Trading Platform API
+  description: |
+    Public entry is the API gateway on :8080. Behind it: auth-service, user-service, market-data-service.
+    Error body is always `{ "error": { "code", "message", "details?" } }`.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080
+    description: API gateway (docker-compose public entry)
+
+tags:
+  - name: Health
+  - name: Auth
+  - name: Users
+  - name: Instruments
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Liveness check
+      operationId: getHealth
+      security: []
+      responses:
+        "200":
+          description: Service is up
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /ready:
+    get:
+      tags: [Health]
+      summary: Gateway readiness (auth, user, market-data /health)
+      operationId: getReady
+      security: []
+      responses:
+        "200":
+          description: Gateway and all upstreams are up
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: One or more upstreams are down
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /openapi.yaml:
+    get:
+      tags: [Health]
+      summary: OpenAPI specification
+      operationId: getOpenAPI
+      security: []
+      responses:
+        "200":
+          description: OpenAPI YAML
+          content:
+            application/yaml:
+              schema:
+                type: string
+
+  /swagger:
+    get:
+      tags: [Health]
+      summary: Swagger UI
+      operationId: getSwaggerUI
+      security: []
+      responses:
+        "200":
+          description: HTML page
+
+  /api/v1/auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a user (role is always user)
+      operationId: register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login and receive a JWT
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/users/me:
+    get:
+      tags: [Users]
+      summary: Current user profile
+      operationId: getMe
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    patch:
+      tags: [Users]
+      summary: Update current user display name
+      operationId: patchMe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchMeRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/users:
+    get:
+      tags: [Users]
+      summary: List users (admin)
+      operationId: listUsers
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Page of users
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/v1/users/{id}:
+    delete:
+      tags: [Users]
+      summary: Delete a user (admin). Cannot delete yourself.
+      operationId: deleteUser
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "204":
+          description: Deleted
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /api/v1/instruments:
+    get:
+      tags: [Instruments]
+      summary: List instruments
+      operationId: listInstruments
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Page of instruments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstrumentPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Instruments]
+      summary: Create instrument (admin)
+      operationId: createInstrument
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InstrumentRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Instrument"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /api/v1/instruments/{id}:
+    get:
+      tags: [Instruments]
+      summary: Get instrument by id
+      operationId: getInstrument
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Instrument
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Instrument"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Instruments]
+      summary: Replace instrument (admin)
+      operationId: updateInstrument
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InstrumentRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Instrument"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      tags: [Instruments]
+      summary: Delete instrument (admin)
+      operationId: deleteInstrument
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "204":
+          description: Deleted
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    ID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  responses:
+    BadRequest:
+      description: Validation or malformed request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: Request validation failed
+              details:
+                - field: email
+                  message: email is required
+    Unauthorized:
+      description: Missing or invalid JWT
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: Missing or invalid access token
+    Forbidden:
+      description: Authenticated but not allowed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: FORBIDDEN
+              message: Admin role required
+    NotFound:
+      description: Resource does not exist
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: NOT_FOUND
+              message: Instrument not found
+    Conflict:
+      description: Unique constraint or illegal state
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: CONFLICT
+              message: Email already registered
+
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          example: ok
+
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: trader@example.com
+        password:
+          type: string
+          minLength: 8
+          maxLength: 72
+          example: secret123
+        displayName:
+          type: string
+          maxLength: 100
+          example: Trader
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: trader@example.com
+        password:
+          type: string
+          example: secret123
+
+    TokenResponse:
+      type: object
+      required: [accessToken, tokenType, expiresIn]
+      properties:
+        accessToken:
+          type: string
+        tokenType:
+          type: string
+          example: Bearer
+        expiresIn:
+          type: integer
+          description: Lifetime in seconds
+          example: 86400
+
+    PatchMeRequest:
+      type: object
+      required: [displayName]
+      properties:
+        displayName:
+          type: string
+          maxLength: 100
+          example: New Name
+
+    User:
+      type: object
+      required: [id, email, role, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+          nullable: true
+        role:
+          type: string
+          enum: [user, admin]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    UserPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+
+    InstrumentRequest:
+      type: object
+      required: [symbol, name, assetClass]
+      properties:
+        symbol:
+          type: string
+          minLength: 1
+          maxLength: 32
+          example: AAPL
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+          example: Apple Inc.
+        assetClass:
+          $ref: "#/components/schemas/AssetClass"
+
+    Instrument:
+      type: object
+      required: [id, symbol, name, assetClass, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        symbol:
+          type: string
+          example: AAPL
+        name:
+          type: string
+          example: Apple Inc.
+        assetClass:
+          $ref: "#/components/schemas/AssetClass"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    InstrumentPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Instrument"
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+
+    AssetClass:
+      type: string
+      enum: [stock, crypto, forex, other]
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum:
+                - VALIDATION_ERROR
+                - UNAUTHORIZED
+                - FORBIDDEN
+                - NOT_FOUND
+                - CONFLICT
+                - BAD_GATEWAY
+                - UNAVAILABLE
+                - INTERNAL_ERROR
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                $ref: "#/components/schemas/FieldError"
+
+    FieldError:
+      type: object
+      required: [field, message]
+      properties:
+        field:
+          type: string
+        message:
+          type: string
+
+security:
+  - bearerAuth: []

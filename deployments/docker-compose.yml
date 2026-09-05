@@ -1,0 +1,109 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: dummy
+      POSTGRES_PASSWORD: dummy
+      POSTGRES_DB: dummy
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dummy -d dummy"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  auth-service:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+    entrypoint: ["/app/auth"]
+    ports:
+      - "8082:8080"
+    environment:
+      HTTP_ADDR: :8080
+      DATABASE_URL: postgres://dummy:dummy@postgres:5432/dummy?sslmode=disable
+      JWT_SECRET: local-dev-secret-change-me
+      JWT_TTL: 24h
+      ADMIN_EMAIL: admin@example.com
+      ADMIN_PASSWORD: admin123
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  user-service:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+    entrypoint: ["/app/user"]
+    ports:
+      - "8083:8080"
+    environment:
+      HTTP_ADDR: :8080
+      DATABASE_URL: postgres://dummy:dummy@postgres:5432/dummy?sslmode=disable
+      JWT_SECRET: local-dev-secret-change-me
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  market-data-service:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+    entrypoint: ["/app/market"]
+    ports:
+      - "8084:8080"
+    environment:
+      HTTP_ADDR: :8080
+      DATABASE_URL: postgres://dummy:dummy@postgres:5432/dummy?sslmode=disable
+      JWT_SECRET: local-dev-secret-change-me
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  api-gateway:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      HTTP_ADDR: :8080
+      AUTH_URL: http://auth-service:8080
+      USER_URL: http://user-service:8080
+      MARKET_URL: http://market-data-service:8080
+      OPENAPI_PATH: /app/openapi.yaml
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      market-data-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  pgdata:

@@ -1,0 +1,10 @@
+.git
+.env
+bin
+tmp
+README.md
+.tools
+.gopath
+go-toolchain.zip
+go.tar.gz
+**/.DS_Store

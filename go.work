@@ -1,0 +1,12 @@
+go 1.23.0
+
+use (
+	./pkg/authjwt
+	./pkg/dbx
+	./pkg/httpx
+	./pkg/web
+	./services/api-gateway
+	./services/auth-service
+	./services/market-data-service
+	./services/user-service
+)
