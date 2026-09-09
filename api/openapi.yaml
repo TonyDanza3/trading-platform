@@ -2,6 +2,7 @@ openapi: 3.0.3
 info:
   title: Trading Platform API
   description: |
+    Fake trading platform built specifically as a target for autotests, not a real broker.
     Public entry is the API gateway on :8080. Behind it: auth-service, user-service, market-data-service.
     Error body is always `{ "error": { "code", "message", "details?" } }`.
   version: 1.0.0

@@ -1,6 +1,6 @@
 # Trading Platform
 
-Go monorepo: API gateway plus three services that share one Postgres. Java autotests should hit the gateway; URL prefixes stay stable when more services appear.
+This is a fake trading platform, built specifically as a target for autotests — not a real broker. It is a Go monorepo: an API gateway plus three services that share one Postgres. Java autotests should hit the gateway; URL prefixes stay stable when more services appear.
 
 ## Run
 
