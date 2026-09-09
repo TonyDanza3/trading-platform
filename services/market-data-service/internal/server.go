@@ -12,6 +12,7 @@ import (
 
 func NewServer(h *Handler, tokens *authjwt.Tokens) http.Handler {
 	r := chi.NewRouter()
+	r.Use(httpx.AccessLog)
 	r.Use(httpx.Recover)
 	r.Use(httpx.RequestID)
 	r.Use(httpx.CORS)

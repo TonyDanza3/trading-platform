@@ -1,8 +1,10 @@
 package httpx
 
 import (
+	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"trading-platform/pkg/web"
 
@@ -45,6 +47,42 @@ func Recover(next http.Handler) http.Handler {
 	})
 }
 
+func AccessLog(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/health" || r.URL.Path == "/ready" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
+		start := time.Now()
+		next.ServeHTTP(sw, r)
+		log.Printf(
+			"%s %s status=%d duration=%s request_id=%s remote=%s",
+			r.Method,
+			r.URL.Path,
+			sw.status,
+			time.Since(start).Round(time.Millisecond),
+			r.Header.Get("X-Request-Id"),
+			r.RemoteAddr,
+		)
+	})
+}
+
 func Wrap(h http.Handler) http.Handler {
-	return Recover(RequestID(CORS(h)))
+	return AccessLog(Recover(RequestID(CORS(h))))
+}
+
+type statusWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (w *statusWriter) WriteHeader(code int) {
+	w.status = code
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *statusWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
 }
