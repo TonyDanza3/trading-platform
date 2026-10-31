@@ -41,18 +41,134 @@ Gateway forwards `Authorization` and `X-Request-Id`. JWT is checked by the servi
 
 Unknown prefixes (for example `/api/v1/orders`) return `404 NOT_FOUND`. A down upstream returns `502 BAD_GATEWAY`.
 
-## Endpoints
+## API
 
-| Method | Path | Who |
-|---|---|---|
-| POST | `/api/v1/auth/register` | public |
-| POST | `/api/v1/auth/login` | public |
-| GET/PATCH | `/api/v1/users/me` | any user |
-| GET | `/api/v1/users` | admin |
-| DELETE | `/api/v1/users/{id}` | admin (cannot delete self) |
-| GET | `/api/v1/instruments` | any user |
-| GET | `/api/v1/instruments/{id}` | any user |
-| POST/PUT/DELETE | `/api/v1/instruments` | admin |
+Java autotests should call the gateway at `http://localhost:8080`. Each service also serves the same paths on its debug port. Send `Content-Type: application/json` when the endpoint has a body. Protected routes need `Authorization: Bearer <accessToken>` from login.
+
+### api-gateway
+
+`http://localhost:8080`. These routes are handled by the gateway and are not proxied.
+
+**GET** `http://localhost:8080/health`
+
+No request body. Liveness of the gateway itself.
+
+**GET** `http://localhost:8080/ready`
+
+No request body. Calls `/health` on auth-service, user-service, and market-data-service.
+
+**GET** `http://localhost:8080/openapi.yaml`
+
+No request body.
+
+**GET** `http://localhost:8080/swagger`
+
+No request body.
+
+### auth-service
+
+Gateway prefix `/api/v1/auth`. Debug: `http://localhost:8082`.
+
+**POST** `http://localhost:8080/api/v1/auth/register`
+
+Public. The created role is always `user`. `displayName` is optional.
+
+```json
+{
+  "email": "trader@example.com",
+  "password": "secret123",
+  "displayName": "Trader"
+}
+```
+
+**POST** `http://localhost:8080/api/v1/auth/login`
+
+Public. Returns `accessToken`, `tokenType` (`Bearer`), and `expiresIn` (seconds).
+
+```json
+{
+  "email": "admin@example.com",
+  "password": "admin123"
+}
+```
+
+**GET** `http://localhost:8082/health`
+
+No request body. Service liveness; the gateway does not proxy this path (it has its own `/health`).
+
+### user-service
+
+Gateway prefix `/api/v1/users`. Debug: `http://localhost:8083`. Every route except `/health` requires a JWT.
+
+**GET** `http://localhost:8080/api/v1/users/me`
+
+Any authenticated user. No request body.
+
+**PATCH** `http://localhost:8080/api/v1/users/me`
+
+Any authenticated user. `displayName` is required; an empty string clears it. At most 100 characters.
+
+```json
+{
+  "displayName": "New Name"
+}
+```
+
+**GET** `http://localhost:8080/api/v1/users?page=1&pageSize=20`
+
+Admin. No request body. Query: `page` (default `1`), `pageSize` (default `20`, max `100`).
+
+**DELETE** `http://localhost:8080/api/v1/users/{id}`
+
+Admin. No request body. `{id}` is a UUID. Deleting your own id returns `409 CONFLICT`.
+
+**GET** `http://localhost:8083/health`
+
+No request body.
+
+### market-data-service
+
+Gateway prefix `/api/v1/instruments`. Debug: `http://localhost:8084`. Every route except `/health` requires a JWT. `assetClass` is one of `stock`, `crypto`, `forex`, `other`. `symbol` is 1–32 characters: letters, digits, `.` or `-` (stored uppercased).
+
+**GET** `http://localhost:8080/api/v1/instruments?page=1&pageSize=20`
+
+Any authenticated user. No request body. Query: `page` (default `1`), `pageSize` (default `20`, max `100`).
+
+**GET** `http://localhost:8080/api/v1/instruments/{id}`
+
+Any authenticated user. No request body. `{id}` is a UUID.
+
+**POST** `http://localhost:8080/api/v1/instruments`
+
+Admin.
+
+```json
+{
+  "symbol": "MSFT",
+  "name": "Microsoft Corporation",
+  "assetClass": "stock"
+}
+```
+
+**PUT** `http://localhost:8080/api/v1/instruments/{id}`
+
+Admin. Replaces the instrument. Same body as create. `{id}` is a UUID.
+
+```json
+{
+  "symbol": "MSFT",
+  "name": "Microsoft Corp.",
+  "assetClass": "stock"
+}
+```
+
+**DELETE** `http://localhost:8080/api/v1/instruments/{id}`
+
+Admin. No request body. `{id}` is a UUID.
+
+**GET** `http://localhost:8084/health`
+
+No request body.
 
 ## Error body
 
@@ -67,11 +183,3 @@ Unknown prefixes (for example `/api/v1/orders`) return `404 NOT_FOUND`. A down u
 ```
 
 Codes: `VALIDATION_ERROR` (400), `UNAUTHORIZED` (401), `FORBIDDEN` (403), `NOT_FOUND` (404), `CONFLICT` (409), `BAD_GATEWAY` (502), `UNAVAILABLE` (503), `INTERNAL_ERROR` (500).
-
-## Example
-
-```bash
-curl -s -X POST http://localhost:8080/api/v1/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"admin@example.com","password":"admin123"}'
-```
